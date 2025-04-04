@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = "1.0.219"
+base64 = "0.22.1"
+ic-transport-types = "0.40.0"
+ic_principal = "0.1.1"
+serde = { version = "1.0.219", features = ["derive"] }

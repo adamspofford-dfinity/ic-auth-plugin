@@ -51,7 +51,7 @@ A greeting must be sent by the plugin immediately after being invoked. A host mu
 ```json
 {
     "v": [1],
-    "select": "required"
+    "select": "required" // optional
 }
 ```
 
@@ -92,7 +92,7 @@ Indicates that the plugin does not support key selection.
 ```json
 {"Err":{
     "kind": "invalid-key",
-    "message": "Keys must be alphanumeric"
+    "message": "Keys must be alphanumeric" // optional
 }}
 ```
 
@@ -161,7 +161,7 @@ A host may ask a plugin to sign a delegation, allowing the host to do its own si
     "action": "sign-delegation",
     "public-key-der": "<base64-encoded DER representation>",
     "desired-expiry": 1743729765,
-    "desired-canisters": ["ryjl3-tyaaa-aaaaa-aaaba-cai", /* etc */]
+    "desired-canisters": ["ryjl3-tyaaa-aaaaa-aaaba-cai", /* etc */] // optional
 }
 ```
 
@@ -200,7 +200,7 @@ Indicates that the plugin does not support wildcard delegations, and requires th
 {"Err":{
     "kind": "unsupported-canister",
     "principals": ["ryjl3-tyaaa-aaaaa-aaaba-cai"],
-    "message": "Not that one!"
+    "message": "Not that one!" // optional
 }}
 ```
 
@@ -252,7 +252,7 @@ Indicates that the user was asked about this request, and they refused. This err
 {"Err":{
     "kind": "unsupported-content",
     "pos": [0],
-    "message": "Candid only!"
+    "message": "Candid only!" // optional
 }}
 ```
 
