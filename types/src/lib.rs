@@ -1,17 +1,19 @@
+use std::borrow::Cow;
+
 use ic_principal::Principal;
 use ic_transport_types::EnvelopeContent;
 use serde::{Deserialize, Serialize};
 
 mod b64;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Greeting {
     pub v: Vec<u32>,
     pub select: SelectMode,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub enum SelectMode {
     Required,
@@ -19,28 +21,28 @@ pub enum SelectMode {
     Unsupported,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "action", rename_all = "kebab-case")]
-pub enum Request {
-    KeySelect(KeySelectRequest),
+pub enum Request<'a> {
+    KeySelect(KeySelectRequest<'a>),
     ListSelectableKeys(ListSelectableKeysRequest),
-    SignDelegation(SignDelegationRequest),
-    SignEnvelopes(SignEnvelopesRequest),
-    SignArbitraryData(SignArbitraryDataRequest),
+    SignDelegation(SignDelegationRequest<'a>),
+    SignEnvelopes(SignEnvelopesRequest<'a>),
+    SignArbitraryData(SignArbitraryDataRequest<'a>),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub struct KeySelectRequest {
+pub struct KeySelectRequest<'a> {
     pub v: u32,
-    pub key: String,
+    pub key: Cow<'a, str>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "kebab-case")]
 pub struct KeySelectResponse {}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(
     rename_all = "kebab-case",
     rename_all_fields = "kebab-case",
@@ -54,18 +56,20 @@ pub enum KeySelectError {
 
 pub type KeySelectResult = Result<KeySelectResponse, KeySelectError>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "kebab-case")]
-pub struct ListSelectableKeysRequest;
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct ListSelectableKeysResponse {
-    keys: Vec<String>,
-    exhaustive: bool,
+pub struct ListSelectableKeysRequest {
+    pub v: u32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct ListSelectableKeysResponse {
+    pub keys: Vec<String>,
+    pub exhaustive: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(
     tag = "kind",
     rename_all = "kebab-case",
@@ -78,18 +82,20 @@ pub enum ListSelectableKeysError {
 
 pub type ListSelectableKeysResult = Result<ListSelectableKeysResponse, ListSelectableKeysError>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "kebab-case")]
-pub struct GetPublicKeyRequest;
+pub struct GetPublicKeyRequest {
+    pub v: u32,
+}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct GetPublicKeyResponse {
     #[serde(with = "b64")]
     public_key_der: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(
     tag = "kind",
     rename_all = "kebab-case",
@@ -101,23 +107,24 @@ pub enum GetPublicKeyError {
 
 pub type GetPublicKeyResult = Result<GetPublicKeyResponse, GetPublicKeyError>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub struct SignDelegationRequest {
+pub struct SignDelegationRequest<'a> {
+    pub v: u32,
     #[serde(with = "b64")]
-    pub public_key_der: Vec<u8>,
+    pub public_key_der: Cow<'a, [u8]>,
     pub desired_expiry: u128,
-    pub desired_canisters: Option<Vec<Principal>>,
+    pub desired_canisters: Option<Cow<'a, [Principal]>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub struct SignDelegationResponse {
+pub struct SignDelegationResponse<'a> {
     #[serde(with = "b64")]
-    pub signature: Vec<u8>,
+    pub signature: Cow<'a, [u8]>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(
     tag = "kind",
     rename_all = "kebab-case",
@@ -133,22 +140,23 @@ pub enum SignDelegationError {
     Refused,
 }
 
-pub type SignDelegationResult = Result<SignDelegationResponse, SignDelegationError>;
+pub type SignDelegationResult<'a> = Result<SignDelegationResponse<'a>, SignDelegationError>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub struct SignEnvelopesRequest {
-    pub contents: Vec<EnvelopeContent>,
+pub struct SignEnvelopesRequest<'a> {
+    pub v: u32,
+    pub contents: Cow<'a, [EnvelopeContent]>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub struct SignEnvelopesResponse {
+pub struct SignEnvelopesResponse<'a> {
     #[serde(with = "b64::list")]
-    pub signatures: Vec<Vec<u8>>,
+    pub signatures: Cow<'a, [Cow<'a, [u8]>]>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(
     tag = "kind",
     rename_all = "kebab-case",
@@ -165,23 +173,24 @@ pub enum SignEnvelopesError {
     },
 }
 
-pub type SignEnvelopesResult = Result<SignEnvelopesResponse, SignEnvelopesError>;
+pub type SignEnvelopesResult<'a> = Result<SignEnvelopesResponse<'a>, SignEnvelopesError>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub struct SignArbitraryDataRequest {
+pub struct SignArbitraryDataRequest<'a> {
+    pub v: u32,
     #[serde(with = "b64")]
-    pub data: Vec<u8>,
+    pub data: Cow<'a, [u8]>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub struct SignArbitraryDataResponse {
+pub struct SignArbitraryDataResponse<'a> {
     #[serde(with = "b64")]
-    pub signature: Vec<u8>,
+    pub signature: Cow<'a, [u8]>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(
     tag = "kind",
     rename_all = "kebab-case",
@@ -192,4 +201,5 @@ pub enum SignArbitraryDataError {
     Custom { message: String },
 }
 
-pub type SignArbitraryDataResult = Result<SignArbitraryDataResponse, SignArbitraryDataError>;
+pub type SignArbitraryDataResult<'a> =
+    Result<SignArbitraryDataResponse<'a>, SignArbitraryDataError>;

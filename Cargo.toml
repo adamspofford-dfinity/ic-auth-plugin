@@ -1,3 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["types"]
+members = ["types", "client", "pkcs11-plugin"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85.0"
+
+[workspace.dependencies]
+ic-transport-types = "0.40.0"
+ic_principal = "0.1.1"
+ic-auth-plugin-types = { path = "types", version = "0.1.0" }

@@ -1,6 +1,8 @@
 # Specification
 
-An IC auth plugin is a program which is invoked with `--ic-auth-plugin` as its first argument. It receives and sends one-line JSON messages over stdin and stdout respectively. Its signal to gracefully shut down is its stdin being closed. After a plugin greets the host, it sends no data proactively, only responding when the host sends a request. Plugins should respond to all well-formed requests with well-formed responses; even if a plugin does not support a particular operation, it should say so with an error response rather than aborting.
+An IC auth plugin is a program which is invoked with `--ic-auth-plugin` as its first argument. It receives and sends one-line JSON messages followed by a newline over stdin and stdout respectively. Its signal to gracefully shut down is its stdin being closed. After a plugin greets the host, it sends no data proactively, only responding when the host sends a request.
+
+Plugins should respond to all well-formed requests with well-formed responses; even if a plugin does not support a particular operation, it should say so with an error response rather than aborting. It is however correct to abort if the plugin requires key selection and the host does not perform it (see below).
 
 A single instance of a plugin process should only represent one signing key, even if a plugin represents a mechanism that contains more than one key. A plugin may require input (see below) to select which key to use. Plugins must support multiple concurrent process instances to enable a host to select multiple keys.
 
