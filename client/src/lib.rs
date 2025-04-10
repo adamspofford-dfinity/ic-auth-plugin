@@ -6,18 +6,23 @@ use std::process::Stdio;
 
 use ic_auth_plugin_types::{
     AuthenticateError, AuthenticateRequest, AuthenticateResult, AuthnMode, DescribeAuthnModeError,
-    DescribeAuthnModeRequest, DescribeAuthnModeResult, Greeting, KeySelectError, KeySelectRequest,
-    KeySelectResult, ListSelectableKeysError, ListSelectableKeysRequest,
-    ListSelectableKeysResponse, ListSelectableKeysResult, Request, SelectMode,
-    SignArbitraryDataError, SignArbitraryDataRequest, SignArbitraryDataResult, SignDelegationError,
-    SignDelegationRequest, SignDelegationResult, SignEnvelopesError, SignEnvelopesRequest,
-    SignEnvelopesResult,
+    DescribeAuthnModeRequest, DescribeAuthnModeResult, GetPublicKeyError, GetPublicKeyRequest,
+    GetPublicKeyResult, Greeting, KeySelectError, KeySelectRequest, KeySelectResult,
+    ListSelectableKeysError, ListSelectableKeysRequest, ListSelectableKeysResponse,
+    ListSelectableKeysResult, Request, SelectMode, SignArbitraryDataError,
+    SignArbitraryDataRequest, SignArbitraryDataResult, SignDelegationError, SignDelegationRequest,
+    SignDelegationResult, SignEnvelopesError, SignEnvelopesRequest, SignEnvelopesResult,
 };
 use ic_principal::Principal;
 use ic_transport_types::EnvelopeContent;
 use thiserror::Error;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter, Lines};
 use tokio::process::{ChildStderr, ChildStdin, ChildStdout, Command};
+
+#[cfg(feature = "identity")]
+mod identity;
+#[cfg(feature = "identity")]
+pub use identity::PluginIdentity;
 
 pub struct Plugin {
     stdin: BufWriter<ChildStdin>,
@@ -167,7 +172,7 @@ impl Plugin {
         public_key_der: &[u8],
         desired_expiry: u128,
         desired_canisters: Option<&[Principal]>,
-    ) -> Result<Vec<u8>, PluginError<SignDelegationError>> {
+    ) -> Result<(Vec<u8>, u128), PluginError<SignDelegationError>> {
         let req = serde_json::to_string(&Request::SignDelegation(SignDelegationRequest {
             v: 1,
             public_key_der: public_key_der.into(),
@@ -178,7 +183,7 @@ impl Plugin {
         let resp = self.readln().await?;
         let resp: SignDelegationResult = serde_json::from_str(&resp)?;
         match resp {
-            Ok(o) => Ok(o.signature.into_owned()),
+            Ok(o) => Ok((o.signature.into_owned(), o.expiry)),
             Err(e) => Err(PluginError::Plugin(e)),
         }
     }
@@ -196,6 +201,17 @@ impl Plugin {
         let resp: SignArbitraryDataResult = serde_json::from_str(&resp)?;
         match resp {
             Ok(o) => Ok(o.signature.into_owned()),
+            Err(e) => Err(PluginError::Plugin(e)),
+        }
+    }
+
+    pub async fn public_key(&mut self) -> Result<Vec<u8>, PluginError<GetPublicKeyError>> {
+        let req = serde_json::to_string(&Request::GetPublicKey(GetPublicKeyRequest { v: 1 }))?;
+        self.writeln(&req).await?;
+        let resp = self.readln().await?;
+        let resp: GetPublicKeyResult = serde_json::from_str(&resp)?;
+        match resp {
+            Ok(o) => Ok(o.public_key_der.into_owned()),
             Err(e) => Err(PluginError::Plugin(e)),
         }
     }
@@ -219,5 +235,10 @@ impl Plugin {
             .next_line()
             .await?
             .ok_or_else(|| IoError::from(ErrorKind::UnexpectedEof))
+    }
+
+    #[cfg(feature = "identity")]
+    pub fn into_identity(self) -> PluginIdentity {
+        PluginIdentity::new(self)
     }
 }

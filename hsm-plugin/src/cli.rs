@@ -17,14 +17,14 @@ pub fn run_cli() -> Result<()> {
         println!("An IC auth plugin for PKCS#11 hardware keys.");
         if config().is_err() {
             println!(
-                "Must be configured before first use. Edit {}.",
+                "\nMust be configured before first use. Edit {}.",
                 config_path().display()
             );
         }
         let self_path = current_exe().unwrap();
         let self_name = self_path.file_name().unwrap();
         println!(
-            "Plugins do not need to be run directly. To use the plugin with an app that supports plugins, \
+            "\nPlugins do not need to be run directly. To use the plugin with an app that supports plugins, \
             go to the app's plugin settings and enter the path {}",
             self_path.display()
         );

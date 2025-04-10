@@ -180,7 +180,7 @@ fn auth_loop() -> Result</* ! */ ()> {
                 stdout,
                 "{}",
                 serde_json::to_string(&GetPublicKeyResult::Ok(GetPublicKeyResponse {
-                    public_key_der: ident.public_key().unwrap()
+                    public_key_der: ident.public_key().unwrap().into()
                 }))?
             )?,
             Request::SignEnvelopes(req) => {
@@ -247,6 +247,7 @@ fn config() -> Result<Config> {
             return Ok(config);
         }
     } else {
+        std::fs::create_dir_all(path.parent().unwrap())?;
         std::fs::write(&path, DEFAULT_CONFIG)?;
     }
     bail!(

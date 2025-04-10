@@ -168,9 +168,9 @@ pub struct GetPublicKeyRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
-pub struct GetPublicKeyResponse {
+pub struct GetPublicKeyResponse<'a> {
     #[serde(with = "b64")]
-    pub public_key_der: Vec<u8>,
+    pub public_key_der: Cow<'a, [u8]>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Error)]
@@ -186,7 +186,7 @@ pub enum GetPublicKeyError {
     Custom { message: String },
 }
 
-pub type GetPublicKeyResult = Result<GetPublicKeyResponse, GetPublicKeyError>;
+pub type GetPublicKeyResult<'a> = Result<GetPublicKeyResponse<'a>, GetPublicKeyError>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "kebab-case")]
