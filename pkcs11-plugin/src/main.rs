@@ -1,9 +1,12 @@
 use std::{
     borrow::Cow,
     io::{BufRead, Write, stdin, stdout},
+    path::PathBuf,
 };
 
-use anyhow::{Context, bail, ensure};
+use anyhow::{Context, Result, bail};
+use cli::run_cli;
+use directories::ProjectDirs;
 use ic_agent::{Identity, identity::Delegation};
 use ic_auth_plugin_types::{
     AuthenticateError, AuthenticateResponse, AuthenticateResult, AuthnMode,
@@ -16,30 +19,52 @@ use ic_auth_plugin_types::{
 };
 use ic_identity_hsm::{HardwareIdentity, HardwareIdentityError};
 use pkcs11::types::{CKR_PIN_INCORRECT, CKR_PIN_INVALID};
+use serde::Deserialize;
 
-fn main() -> anyhow::Result<()> {
-    ensure!(
-        std::env::args()
-            .nth(1)
-            .is_some_and(|arg| arg == "--ic-auth-plugin"),
-        "This program is an auth plugin and should not be run directly."
-    );
+mod cli;
 
+fn main() -> Result<()> {
+    if std::env::args()
+        .nth(1)
+        .is_some_and(|arg| arg == "--ic-auth-plugin")
+    {
+        auth_loop()?;
+    } else {
+        run_cli()?;
+    }
+    Ok(())
+}
+
+fn auth_loop() -> Result</* ! */ ()> {
     let mut stdin = stdin().lock();
     let mut stdout = stdout().lock();
+    let config = match config() {
+        Ok(config) => config,
+        Err(err) => {
+            writeln!(
+                stdout,
+                "{}",
+                serde_json::to_string(&Greeting {
+                    v: vec![1],
+                    select: None,
+                    abort: Some(format!("{err}"))
+                })?
+            )?;
+            std::process::abort();
+        }
+    };
     writeln!(
         stdout,
         "{}",
         serde_json::to_string(&Greeting {
             v: vec![1],
-            select: SelectMode::Unsupported
+            select: Some(SelectMode::Unsupported),
+            abort: None,
         })?
     )?;
     let mut msg_buf = String::new();
     let zero_auth_attempt =
-        match HardwareIdentity::new("/opt/homebrew/lib/softhsm/libsofthsm2.so", 0, "01", || {
-            Err(String::new())
-        }) {
+        match HardwareIdentity::new(&config.pkcs11_module_path, 0, "01", || Err(String::new())) {
             Ok(ident) => Some(ident),
             Err(HardwareIdentityError::UserPinRequired(_)) => None,
             Err(e) => return Err(e.into()),
@@ -102,12 +127,9 @@ fn main() -> anyhow::Result<()> {
                                 .value
                                 .context("integrated password missing")?
                                 .into_owned();
-                            match HardwareIdentity::new(
-                                "/opt/homebrew/lib/softhsm/libsofthsm2.so",
-                                0,
-                                "01",
-                                || Ok(password),
-                            ) {
+                            match HardwareIdentity::new(&config.pkcs11_module_path, 0, "01", || {
+                                Ok(password)
+                            }) {
                                 Ok(ident) => {
                                     writeln!(
                                         stdout,
@@ -205,4 +227,36 @@ fn main() -> anyhow::Result<()> {
             _ => bail!("handshake messages repeated"),
         }
     }
+}
+
+fn config_path() -> PathBuf {
+    ProjectDirs::from("", "", "pkcs11-ic-auth-plugin")
+        .unwrap()
+        .config_dir()
+        .join("config.toml")
+}
+
+fn config() -> Result<Config> {
+    const DEFAULT_CONFIG: &str =
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/default-config.toml"));
+    let path = config_path();
+    if path.exists() {
+        let contents = std::fs::read_to_string(&path)?;
+        if contents != DEFAULT_CONFIG {
+            let config = toml::from_str(&contents)?;
+            return Ok(config);
+        }
+    } else {
+        std::fs::write(&path, DEFAULT_CONFIG)?;
+    }
+    bail!(
+        "pkcs11-ic-auth-plugin has not been configured, please edit {}",
+        path.display()
+    );
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct Config {
+    pkcs11_module_path: PathBuf,
 }

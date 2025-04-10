@@ -8,10 +8,17 @@ edition = "2024"
 rust-version = "1.85.0"
 
 [workspace.dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0"
+directories = "6.0"
 ic-auth-plugin-types = { path = "types", version = "0.1.0" }
-ic_principal = "0.1.1"
-ic-transport-types = "0.40.0"
-serde_json = "1.0.140"
+ic_principal = "0.1"
+ic-transport-types = "0.40"
+pico-args = { version = "0.5", features = ["eq-separator"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 thiserror = "2.0"
 tokio = "1.44"
+toml = "0.8"
+
+[profile.release]
+opt-level = 2

@@ -1,0 +1,8 @@
+# This file configures the behavior of the PKCS#11 IC auth plugin.
+# The only mandatory field is the location of the PKCS#11 module that the plugin should use.
+# This is likely provided by the manufacturer of your HSM or smartcard.
+# Your device may also be supported by the generic module from OpenSC.
+# You should end up with a file path to a .so file (*nix, including macOS) or a .dll file (Windows).
+
+# Remove the '#' from the following line and place your module path between the quotes:
+# pkcs11-module-path = ""

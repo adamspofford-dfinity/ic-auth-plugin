@@ -14,7 +14,8 @@ mod b64;
 #[serde(rename_all = "kebab-case")]
 pub struct Greeting {
     pub v: Vec<u32>,
-    pub select: SelectMode,
+    pub select: Option<SelectMode>,
+    pub abort: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Eq, PartialEq)]

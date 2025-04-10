@@ -63,7 +63,7 @@ impl Plugin {
             return Err(PluginError::Incompatible);
         }
         Ok(Self {
-            select_mode: greeting.select,
+            select_mode: greeting.select.unwrap_or(SelectMode::Unsupported),
             stdin,
             stdout,
             stderr: child.stderr.take(),

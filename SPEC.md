@@ -54,7 +54,7 @@ Requests have defined error cases, specified in the `kind` field, but all reques
 }
 ```
 
-Plugins should use the `custom` case for plugin-specific error cases not defined by the specification, and must provide a human-readable message in `message`.
+Plugins should use the `custom` case for plugin-specific error cases not defined by the specification. The `message` field should be human-readable.
 
 ## Greeting
 
@@ -70,6 +70,19 @@ A greeting must be sent by the plugin immediately after being invoked. A host mu
 A greeting indicates the versions of the ic-auth-plugin interface that the plugin supports. All message structures have a `v` field to indicate what version they are for. Nonstandard protocol extensions should be marked with string versions starting with `#`; integers and strings not starting with `#` are reserved. Hosts must not send plugins any messages with versions they do not support.
 
 A plugin may optionally indicate that it supports key selection. The `select` field can be set to `required`, `supported`, or `unsupported`, and if absent is assumed to be `unsupported`.
+
+### Errors
+
+If a plugin fails to start, it should report this with a greeting containing an `abort` field:
+
+```json
+{
+    "v": [1],
+    "abort": "Malformed configuration"
+}
+```
+
+The `abort` field reports the error message, and should be human-readable. After reporting this message the plugin may immediately abort with a non-zero exit code without waiting for its stdin to be closed.
 
 ## Key selection
 
@@ -212,7 +225,7 @@ Indicates that the `integrated` field did not match the currently required authe
 }}
 ```
 
-Indicates that authentication failed for a reason semantically similar to a bad password (e.g. unknown username, expired certificate, failed captcha). The `message` field must be human-readable.
+Indicates that authentication failed for a reason semantically similar to a bad password (e.g. unknown username, expired certificate, failed captcha). The `message` field should be human-readable.
 
 ## Request for a public key
 
