@@ -1,13 +1,17 @@
+use std::borrow::Cow;
+use std::convert::Infallible;
 use std::ffi::OsStr;
-use std::io::{Error as IoError, ErrorKind};
+use std::io::{self, Error as IoError, ErrorKind, IoSlice};
 use std::process::Stdio;
 
 use ic_auth_plugin_types::{
-    Greeting, KeySelectError, KeySelectRequest, KeySelectResult, ListSelectableKeysError,
-    ListSelectableKeysRequest, ListSelectableKeysResponse, ListSelectableKeysResult, Request,
-    SelectMode, SignArbitraryDataError, SignArbitraryDataRequest, SignArbitraryDataResult,
-    SignDelegationError, SignDelegationRequest, SignDelegationResult, SignEnvelopesError,
-    SignEnvelopesRequest, SignEnvelopesResult,
+    AuthenticateError, AuthenticateRequest, AuthenticateResult, AuthnMode, DescribeAuthnModeError,
+    DescribeAuthnModeRequest, DescribeAuthnModeResult, Greeting, KeySelectError, KeySelectRequest,
+    KeySelectResult, ListSelectableKeysError, ListSelectableKeysRequest,
+    ListSelectableKeysResponse, ListSelectableKeysResult, Request, SelectMode,
+    SignArbitraryDataError, SignArbitraryDataRequest, SignArbitraryDataResult, SignDelegationError,
+    SignDelegationRequest, SignDelegationResult, SignEnvelopesError, SignEnvelopesRequest,
+    SignEnvelopesResult,
 };
 use ic_principal::Principal;
 use ic_transport_types::EnvelopeContent;
@@ -35,14 +39,14 @@ pub enum PluginError<E> {
 }
 
 impl Plugin {
-    pub async fn open(program: impl AsRef<OsStr>) -> Result<Self, PluginError<()>> {
+    pub async fn open(program: impl AsRef<OsStr>) -> Result<Self, PluginError<Infallible>> {
         Self::open_with_stderr(program, Stdio::inherit()).await
     }
 
     pub async fn open_with_stderr(
         program: impl AsRef<OsStr>,
         stderr: impl Into<Stdio>,
-    ) -> Result<Self, PluginError<()>> {
+    ) -> Result<Self, PluginError<Infallible>> {
         let mut child = Command::new(program)
             .arg("--ic-auth-plugin")
             .stdin(Stdio::piped())
@@ -76,12 +80,8 @@ impl Plugin {
         let req = serde_json::to_string(&Request::ListSelectableKeys(ListSelectableKeysRequest {
             v: 1,
         }))?;
-        self.stdin.write_all(req.as_bytes()).await?;
-        let resp = self
-            .stdout
-            .next_line()
-            .await?
-            .ok_or_else(|| IoError::from(ErrorKind::UnexpectedEof))?;
+        self.writeln(&req).await?;
+        let resp = self.readln().await?;
         let resp: ListSelectableKeysResult = serde_json::from_str(&resp)?;
         match resp {
             Ok(keys) => Ok(Some(keys)),
@@ -95,13 +95,44 @@ impl Plugin {
             v: 1,
             key: key.into(),
         }))?;
-        self.stdin.write_all(req.as_bytes()).await?;
-        let resp = self
-            .stdout
-            .next_line()
-            .await?
-            .ok_or_else(|| IoError::from(ErrorKind::UnexpectedEof))?;
+        self.writeln(&req).await?;
+
+        let resp = self.readln().await?;
         let resp: KeySelectResult = serde_json::from_str(&resp)?;
+        match resp {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PluginError::Plugin(e)),
+        }
+    }
+
+    pub async fn authn_mode(
+        &mut self,
+    ) -> Result<(AuthnMode, Option<String>), PluginError<DescribeAuthnModeError>> {
+        let req = serde_json::to_string(&Request::DescribeAuthnMode(DescribeAuthnModeRequest {
+            v: 1,
+        }))?;
+        self.writeln(&req).await?;
+        let resp = self.readln().await?;
+        let resp: DescribeAuthnModeResult = serde_json::from_str(&resp)?;
+        match resp {
+            Ok(mode) => Ok((mode.mode, mode.value)),
+            Err(e) => Err(PluginError::Plugin(e)),
+        }
+    }
+
+    pub async fn authenticate(
+        &mut self,
+        integrated_mode: Option<AuthnMode>,
+        integrated_value: Option<String>,
+    ) -> Result<(), PluginError<AuthenticateError>> {
+        let req = serde_json::to_string(&Request::Authenticate(AuthenticateRequest {
+            integrated: integrated_mode,
+            value: integrated_value.map(Cow::from),
+            v: 1,
+        }))?;
+        self.writeln(&req).await?;
+        let resp = self.readln().await?;
+        let resp: AuthenticateResult = serde_json::from_str(&resp)?;
         match resp {
             Ok(_) => Ok(()),
             Err(e) => Err(PluginError::Plugin(e)),
@@ -116,12 +147,8 @@ impl Plugin {
             v: 1,
             contents: envelopes.into(),
         }))?;
-        self.stdin.write_all(req.as_bytes()).await?;
-        let resp = self
-            .stdout
-            .next_line()
-            .await?
-            .ok_or_else(|| IoError::from(ErrorKind::UnexpectedEof))?;
+        self.writeln(&req).await?;
+        let resp = self.readln().await?;
         let resp: SignEnvelopesResult = serde_json::from_str(&resp)?;
         match resp {
             #[allow(clippy::unnecessary_to_owned)] // false positive, the first into_owned is no-op
@@ -147,12 +174,8 @@ impl Plugin {
             desired_expiry,
             desired_canisters: desired_canisters.map(Into::into),
         }))?;
-        self.stdin.write_all(req.as_bytes()).await?;
-        let resp = self
-            .stdout
-            .next_line()
-            .await?
-            .ok_or_else(|| IoError::from(ErrorKind::UnexpectedEof))?;
+        self.writeln(&req).await?;
+        let resp = self.readln().await?;
         let resp: SignDelegationResult = serde_json::from_str(&resp)?;
         match resp {
             Ok(o) => Ok(o.signature.into_owned()),
@@ -168,12 +191,8 @@ impl Plugin {
             v: 1,
             data: data.into(),
         }))?;
-        self.stdin.write_all(req.as_bytes()).await?;
-        let resp = self
-            .stdout
-            .next_line()
-            .await?
-            .ok_or_else(|| IoError::from(ErrorKind::UnexpectedEof))?;
+        self.writeln(&req).await?;
+        let resp = self.readln().await?;
         let resp: SignArbitraryDataResult = serde_json::from_str(&resp)?;
         match resp {
             Ok(o) => Ok(o.signature.into_owned()),
@@ -183,5 +202,22 @@ impl Plugin {
 
     pub fn take_stderr(&mut self) -> Option<ChildStderr> {
         self.stderr.take()
+    }
+
+    async fn writeln(&mut self, line: &str) -> io::Result<()> {
+        let bufs = [IoSlice::new(line.as_bytes()), IoSlice::new(b"\n")];
+        let mut len = line.len() + 1;
+        while len != 0 {
+            len -= self.stdin.write_vectored(&bufs).await?;
+        }
+        self.stdin.flush().await?;
+        Ok(())
+    }
+
+    async fn readln(&mut self) -> io::Result<String> {
+        self.stdout
+            .next_line()
+            .await?
+            .ok_or_else(|| IoError::from(ErrorKind::UnexpectedEof))
     }
 }

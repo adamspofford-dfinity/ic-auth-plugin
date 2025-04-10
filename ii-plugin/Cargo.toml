@@ -1,13 +1,11 @@
 [package]
-name = "pkcs11-ic-auth-plugin"
+name = "ii-auth-plugin"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-anyhow.workspace = true
 ic-auth-plugin-types.workspace = true
 serde_json.workspace = true
-ic-identity-hsm = "0.40.0"
+candid = "0.10.13"
 ic-agent = "0.40.0"
-pkcs11 = "0.5"

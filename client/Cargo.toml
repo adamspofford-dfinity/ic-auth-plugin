@@ -8,6 +8,10 @@ rust-version.workspace = true
 tokio = { version = "1.44.1", features = ["process", "io-util"] }
 ic-auth-plugin-types.workspace = true
 ic-transport-types.workspace = true
-serde_json = "1.0.140"
-thiserror = "2.0.12"
+serde_json.workspace = true
+thiserror.workspace = true
 ic_principal.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+tokio = { workspace = true, features = ["full"] }

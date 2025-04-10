@@ -1,10 +1,20 @@
+! TODO signature delegations
+
 # Specification
 
 An IC auth plugin is a program which is invoked with `--ic-auth-plugin` as its first argument. It receives and sends one-line JSON messages followed by a newline over stdin and stdout respectively. Its signal to gracefully shut down is its stdin being closed. After a plugin greets the host, it sends no data proactively, only responding when the host sends a request.
 
-Plugins should respond to all well-formed requests with well-formed responses; even if a plugin does not support a particular operation, it should say so with an error response rather than aborting. It is however correct to abort if the plugin requires key selection and the host does not perform it (see below).
+Plugins should respond to all well-formed requests with well-formed responses; even if a plugin does not support a particular operation, it should say so with an error response rather than aborting. It is however correct to abort if the plugin requires key selection and the host does not perform it (see below), if the handshake flow is not followed, or if a message is ill-formed.
+
+When a plugin is instantiated, the handshake process must be completed before other messages are sent:
+
+1. The plugin sends the host a greeting message. After this point, key listing requests may be sent by the host, and the plugin no longer sends any proactive messages without the host sending a request.
+2. The host may send the plugin a key selection request based on whether the plugin supports/requires one. After this point, authentication mode requests and public key requests may be sent by the host.
+3. The host sends the plugin an authentication request. After this point, all other messages may be sent.
 
 A single instance of a plugin process should only represent one signing key, even if a plugin represents a mechanism that contains more than one key. A plugin may require input (see below) to select which key to use. Plugins must support multiple concurrent process instances to enable a host to select multiple keys.
+
+If a plugin's user authentication expires (such as an expiry being hit on a required delegation), it should abort with a zero exit code. Plugins should not abort with a zero exit code for any other reason unless their stdin has been closed; a zero exit code implies that the host may immediately restart it.
 
 The following message structures are displayed in this document with newlines, but must be sent without newlines. All fields are required unless specified otherwise.
 
@@ -63,7 +73,7 @@ A plugin may optionally indicate that it supports key selection. The `select` fi
 
 ## Key selection
 
-A key selection request may be sent by the host to instruct the plugin which of its keys should be used for the remainder of the session. The host must send no messages other than "list selectable keys" before selecting a key, and must not select a key more than once. The host should not send this request to plugins that did not declare selection support in their greeting, and the host must not send requests without selecting a key to a plugin that declared selection to be required.
+A key selection request may be sent by the host to instruct the plugin which of its keys should be used for the remainder of the session. The host must send no messages other than "list selectable keys" before selecting a key, and if the key selection request is successful, the host must not send another for the remainder of the session. The host should not send this request to plugins that did not declare selection support in their greeting, and the host must not send requests without selecting a key to a plugin that declared selection to be required.
 
 A key is selected by a name string. This name should not be secret; any required authentication should be performed separately by the plugin. The name should be enterable by a user. A key may have multiple names.
 
@@ -132,6 +142,78 @@ The `exhaustive` field, if set to false, indicates that a host that renders the 
 
 Indicates that the plugin's keys cannot be listed.
 
+## Authentication mode
+
+A host may request information about how the plugin authenticates the user, to better integrate with the plugin's authentication process. For example, if the user must visit a URL, the host application may be able to send the user to the URL less disruptively than simply popping open a browser window unannounced. Any key selection must be performed before sending this message.
+
+```json
+{
+    "v": 1,
+    "action": "describe-authn-mode"
+}
+```
+
+### Response
+
+```json
+{"Ok":{
+    "mode": "url",
+    "value": "https://example.com" // dependent
+}}
+```
+
+The `mode` field must be set to one of the following values:
+
+* `url`: The plugin requires the user to visit a URL in a browser. Hosts may wish to send the user to this URL themselves with a button. The `value` field must contain the URL in question.
+* `password`: The plugin requires the user to enter a password or PIN. Hosts may wish to integrate requesting this password.
+* `window`: The plugin requires the user to interact with a GUI window. Hosts may wish to notify the user of an impending popup.
+* `message`: The plugin requires the user to perform some action described by a message. Hosts may wish to integrate displaying this message. The `value` field must contain the message in question.
+* `automatic`: The plugin performs any authentication without requiring the user's attention.
+
+Plugins do not need to describe password inputs as `password` or browser inputs as `url` if they prefer not to trust the host; in these cases they should set `mode` to `window` or `message`. Plugins with other authentication procedures that require user input should also say `window` or `message`; these are catch-all categories. However, plugins that feature no authentication at all should report `automatic`.
+
+Reported authentication modes should reflect the *current* requirements of the plugin, not the plugin's theoretical model. For example, if a plugin fetches a login token through the browser, but the plugin already has a token from a previous instantiation, it should report `automatic`. Accordingly, hosts should respond to `automatic` modes swiftly.
+
+## Authenticate
+
+A host must send an authentication request before sending signature requests. All forms of user authentication should be delayed until this request. Any key selection must be performed before this request. If the host receives a successful response, authentication requests must not be sent again for the remainder of the session.
+
+```json
+{
+    "v": 1,
+    "action": "authenticate",
+    "integrated": "password", // optional
+    "value": "hunter2" // dependent
+}
+```
+
+The `integrated` field mentions the form of authentication that the plugin would have performed but the host has performed for it. Its valid values are the same as the `mode` field of the authentication mode response. A value of `password` requires the `value` field to contain the collected password/PIN. A value of `automatic` indicates that the host does not expect the user's attention to be required; if a plugin previously reported that it was `automatic`, but this information is stale and it now requires some active form of authentication, then it should return a `bad-mode` error rather than proceeding to authentication, and report the new mode upon the next authentication mode request. Plugins should always be able to complete authentication on their own without the host's help.
+
+### Response
+
+```json
+{"Ok":{}}
+```
+
+### Errors
+
+```json
+{"Err":{
+    "kind": "bad-mode"
+}}
+```
+
+Indicates that the `integrated` field did not match the currently required authentication mode (which may be different than what was currently required last time the host asked). Must not be sent if the `integrated` field was omitted.
+
+```json
+{"Err":{
+    "kind": "bad-authn",
+    "message": "Wrong password"
+}}
+```
+
+Indicates that authentication failed for a reason semantically similar to a bad password (e.g. unknown username, expired certificate, failed captcha). The `message` field must be human-readable.
+
 ## Request for a public key
 
 A public key request is sent to learn the public key corresponding to the private key which the plugin will use for the current session. All plugins must support this operation.
@@ -152,6 +234,16 @@ A public key request is sent to learn the public key corresponding to the privat
 ```
 
 Public key encoding is defined by the IC specification, and unversioned; hosts should be prepared to deal with keys in encodings they do not know about, but v1 plugins must only send keys that can be blindly converted to self-authenticating principals.
+
+### Errors
+
+```json
+{"Err":{
+    "kind": "requires-authn"
+}}
+```
+
+Indicates that the plugin requires authentication to be performed before it can provide a public key.
 
 ## Request for a delegation
 
@@ -290,3 +382,9 @@ A host may ask a plugin to sign arbitrary data. Plugins do not have to support t
 
 Indicates that signing arbitrary data is unsupported by the plugin.
 
+```json
+{"Err":{
+    "kind": "refused"
+}}
+
+Indicates that the user was asked about this request, and they refused. This error should not be used for automated responses.

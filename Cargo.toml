@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["types", "client", "pkcs11-plugin"]
+members = ["types", "client", "pkcs11-plugin", "ii-plugin"]
 
 [workspace.package]
 version = "0.1.0"
@@ -8,6 +8,10 @@ edition = "2024"
 rust-version = "1.85.0"
 
 [workspace.dependencies]
-ic-transport-types = "0.40.0"
-ic_principal = "0.1.1"
+anyhow = "1.0.97"
 ic-auth-plugin-types = { path = "types", version = "0.1.0" }
+ic_principal = "0.1.1"
+ic-transport-types = "0.40.0"
+serde_json = "1.0.140"
+thiserror = "2.0"
+tokio = "1.44"
