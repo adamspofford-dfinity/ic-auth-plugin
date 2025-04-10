@@ -1,5 +1,5 @@
 [package]
-name = "pkcs11-ic-auth-plugin"
+name = "hsm-ic-auth-plugin"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

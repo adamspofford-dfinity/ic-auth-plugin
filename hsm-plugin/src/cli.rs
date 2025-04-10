@@ -14,7 +14,7 @@ pub fn run_cli() -> Result<()> {
             Info::ActiveModule => println!("{}", super::config()?.pkcs11_module_path.display()),
         }
     } else {
-        println!("PKCS#11 IC auth plugin.");
+        println!("An IC auth plugin for PKCS#11 hardware keys.");
         if config().is_err() {
             println!(
                 "Must be configured before first use. Edit {}.",

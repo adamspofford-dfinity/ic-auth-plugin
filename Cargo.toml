@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["types", "client", "pkcs11-plugin", "ii-plugin"]
+members = ["types", "client", "hsm-plugin", "ii-plugin"]
 
 [workspace.package]
 version = "0.1.0"
