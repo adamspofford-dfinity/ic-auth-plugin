@@ -21,6 +21,7 @@ use tokio::process::{ChildStderr, ChildStdin, ChildStdout, Command};
 
 #[cfg(feature = "identity")]
 mod identity;
+pub use ic_auth_plugin_types as types;
 #[cfg(feature = "identity")]
 pub use identity::PluginIdentity;
 
